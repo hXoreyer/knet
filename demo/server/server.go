@@ -9,7 +9,10 @@ func main() {
 	s := knet.NewTCPServer("127.0.0.1", 5555)
 	//全局中间件
 	s.Use(func(request knet.IRequest) {
-		fmt.Println("[Middleware] This is middleware by Id:", request.GetID())
+		fmt.Println("[Middleware] This is middleware1 by Id:", request.GetID())
+	})
+	s.Use(func(request knet.IRequest) {
+		fmt.Println("[Middleware] This is middleware2 by Id:", request.GetID())
 	})
 	//请求路由
 	s.Before(1, func(request knet.IRequest) {

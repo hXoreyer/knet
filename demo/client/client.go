@@ -32,18 +32,28 @@ func main() {
 	buf = append(buf, buf2...)
 	for {
 		con.Write(buf)
-		buf := make([]byte, 1024)
-		n, err := con.Read(buf)
+		dp := knet.NewPack()
+		head := make([]byte, dp.GetHeadLen())
+		if _, err := io.ReadFull(con, head); err != nil {
+			fmt.Println("read msg head err:", err)
+			break
+		}
 
-		if n == 0 {
-			fmt.Printf("read err %s\n", con.RemoteAddr().String())
+		msg, err := dp.Unpack(head)
+		if err != nil {
+			fmt.Println("unpack err:", err)
 			break
 		}
-		if err != nil && err != io.EOF {
-			fmt.Println("read error")
-			break
+
+		if msg.GetLen() > 0 {
+			temp := make([]byte, msg.GetLen())
+			if _, err := io.ReadFull(con, temp); err != nil {
+				fmt.Println("read msg data err:", err)
+				break
+			}
+			msg.SetData(temp)
 		}
-		fmt.Println("recv by host data = ", string(buf[:n]))
+		fmt.Printf("[Recv] ID = %d, Data = %s\n", msg.GetID(), string(msg.GetData()))
 
 		time.Sleep(time.Second)
 	}
