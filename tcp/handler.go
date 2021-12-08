@@ -20,11 +20,25 @@ type IHandler interface {
 	After(uint32, RouterFunc)
 	//添加全局中间件
 	Use(RouterFunc)
+	//终断请求
+	Abort()
+
+	//工作池
+	//启动工作池
+	RunWorkPool()
+	//向工作池发送请求
+	Send2Tasks(rq IRequest)
+	//设置工作池大小
+	SetWorkPoolSize(size uint32)
 }
 
 type Handler struct {
-	routers     map[uint32]IRouter
-	Middlewares []RouterFunc
+	routers      map[uint32]IRouter
+	Middlewares  []RouterFunc
+	abort        bool
+	workpoolSize uint32
+	tasks        []chan IRequest
+	poolNum      map[uint32]uint32
 }
 
 //调度Router
@@ -36,6 +50,10 @@ func (h *Handler) RunHandler(request IRequest) {
 	}
 	for k := range h.Middlewares {
 		h.Middlewares[k](request)
+		if h.abort {
+			h.abort = false
+			return
+		}
 	}
 	handle.start(request)
 }
@@ -71,14 +89,67 @@ func (h *Handler) After(id uint32, rf RouterFunc) {
 	h.routers[id].After(rf)
 	fmt.Printf("[Handler] Add ID = %d, type = %s\n", id, "After")
 }
+
+//全局中间件
 func (h *Handler) Use(rf RouterFunc) {
 	h.Middlewares = append(h.Middlewares, rf)
+}
+
+//终断请求
+func (h *Handler) Abort() {
+	h.abort = true
+}
+
+//工作池数量
+func (h *Handler) SetWorkPoolSize(size uint32) {
+	h.workpoolSize = size
 }
 
 //实例化
 func NewHandler() IHandler {
 	return &Handler{
-		routers:     make(map[uint32]IRouter),
-		Middlewares: make([]RouterFunc, 0),
+		routers:      make(map[uint32]IRouter),
+		Middlewares:  make([]RouterFunc, 0),
+		abort:        false,
+		workpoolSize: 10,
+		poolNum:      make(map[uint32]uint32),
 	}
+}
+
+//启动工作池
+func (h *Handler) RunWorkPool() {
+	h.tasks = make([]chan IRequest, h.workpoolSize)
+	for i := 0; i < int(h.workpoolSize); i++ {
+		h.tasks[i] = make(chan IRequest)
+		h.poolNum[uint32(i)] = 0
+		go h.runWork(i, h.tasks[i])
+	}
+	fmt.Printf("[WorkPool] %d workpools are Running...\n\n", h.workpoolSize)
+}
+
+//启动一个工作
+func (h *Handler) runWork(i int, tr chan IRequest) {
+	for {
+		select {
+		case rq := <-tr:
+			h.RunHandler(rq)
+			rid := rq.getRid()
+			(*rid)--
+			h.poolNum[uint32(i)]--
+		}
+	}
+}
+
+func (h *Handler) Send2Tasks(rq IRequest) {
+	id := 0
+	max := h.poolNum[0]
+	for k, v := range h.poolNum {
+		if v < uint32(max) {
+			max = v
+			id = int(k)
+		}
+	}
+	fmt.Printf("[WorkPool] Task id:%d work in pool id:%d\n", rq.GetID(), id)
+	h.poolNum[uint32(id)]++
+	h.tasks[id] <- rq
 }

@@ -14,10 +14,9 @@ type IRouter interface {
 }
 
 type Router struct {
-	middlewares []RouterFunc
-	before      RouterFunc
-	on          RouterFunc
-	after       RouterFunc
+	before RouterFunc
+	on     RouterFunc
+	after  RouterFunc
 }
 
 //实例化
@@ -38,9 +37,7 @@ func (r *Router) On(router RouterFunc) {
 func (r *Router) After(router RouterFunc) {
 	r.after = router
 }
-func (r *Router) Use(router RouterFunc) {
-	r.middlewares = append(r.middlewares, router)
-}
+
 func (r *Router) start(request IRequest) {
 	r.before(request)
 	r.on(request)

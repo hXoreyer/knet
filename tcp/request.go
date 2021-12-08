@@ -13,6 +13,7 @@ type IRequest interface {
 	GetID() uint32
 	//获取数据长度
 	GetLen() uint32
+	getRid() *uint32
 }
 
 type Request struct {
@@ -20,6 +21,16 @@ type Request struct {
 	conn IConnection
 	//客户端请求的数据
 	msg IMessage
+	//当前Request的ID
+	rid *uint32
+}
+
+func NewRequest(con IConnection, msg IMessage, rid *uint32) IRequest {
+	return &Request{
+		conn: con,
+		msg:  msg,
+		rid:  rid,
+	}
 }
 
 //获取当前连接
@@ -40,4 +51,8 @@ func (r *Request) GetID() uint32 {
 //获取数据长度
 func (r *Request) GetLen() uint32 {
 	return r.msg.GetLen()
+}
+
+func (r *Request) getRid() *uint32 {
+	return r.rid
 }

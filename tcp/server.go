@@ -21,18 +21,21 @@ type IServer interface {
 	After(uint32, RouterFunc)
 	//添加全局中间件
 	Use(RouterFunc)
+	Abort()
+
+	//设置工作池大小
+	SetWorkPoolSize(uint32)
 }
 
 type TCPServer struct {
-	IP          string
-	Port        int
-	Conn        *net.TCPListener
-	IPVersion   string
-	Routers     IHandler
-	MaxConn     int //最大连接数 默认1000
-	MaxPackSize int //包大小 默认1024
-	Version     string
-	Name        string
+	IP        string
+	Port      int
+	Conn      *net.TCPListener
+	IPVersion string
+	Routers   IHandler
+	Version   string
+	Name      string
+	rids      *uint32
 }
 
 //启动服务器
@@ -40,30 +43,31 @@ func (s *TCPServer) start() {
 	//获取TCP地址
 	addr, err := net.ResolveTCPAddr(s.IPVersion, fmt.Sprintf("%s:%d", s.IP, s.Port))
 	if err != nil {
-		fmt.Println("resolve tcp addr err:", err)
+		fmt.Println("[Error] Resolve tcp addr err:", err)
 		return
 	}
 
 	//监听服务器地址
 	s.Conn, err = net.ListenTCP(s.IPVersion, addr)
 	if err != nil {
-		fmt.Println("listen tcp err:", err)
+		fmt.Println("[Error] Listen tcp err:", err)
 		return
 	}
 
 	//监听成功输出
-	fmt.Println("start server success,now listenning...")
-
+	fmt.Println("[Init] Start server success...")
+	//开启工作池
+	s.Routers.RunWorkPool()
 	//循环接受用户连接
 	for {
 		con, err := s.Conn.AcceptTCP()
 		if err != nil {
-			fmt.Println("accept err:", err)
+			fmt.Println("[Error] Accept err:", err)
 			continue
 		}
 		var cid uint32
 		cid = 0
-		dealCon := NewConnection(con, cid, s.Routers)
+		dealCon := NewConnection(con, cid, s.Routers, s.rids)
 		cid++
 		go dealCon.Start()
 	}
@@ -88,36 +92,29 @@ func (s *TCPServer) AddRouter(id uint32, router IRouter) {
 //添加全局中间件
 func (s *TCPServer) Use(rf RouterFunc) {
 	s.Routers.Use(rf)
-	fmt.Println("[Middlewares] Add Middleware...")
+}
+
+//终断请求
+func (s *TCPServer) Abort() {
+	s.Routers.Abort()
 }
 
 //创建新的Server模块
 func NewTCPServer(ip string, port int) IServer {
 	return &TCPServer{
-		IPVersion:   "tcp4",
-		IP:          ip,
-		Port:        port,
-		Routers:     NewHandler(),
-		Name:        "Knet",
-		Version:     "V1.0",
-		MaxConn:     1000,
-		MaxPackSize: 1024,
+		IPVersion: "tcp4",
+		IP:        ip,
+		Port:      port,
+		Routers:   NewHandler(),
+		Name:      "Knet",
+		Version:   "V1.0",
+		rids:      new(uint32),
 	}
 }
 
 /*
 	非接口方法
 */
-
-//设置最大连接数
-func (s *TCPServer) SetMaxConn(size int) {
-	s.MaxConn = size
-}
-
-//设置包大小
-func (s *TCPServer) SetMaxPackSize(size int) {
-	s.MaxPackSize = size
-}
 
 //设置名称
 func (s *TCPServer) SetName(name string) {
@@ -129,6 +126,7 @@ func (s *TCPServer) SetVersion(ver string) {
 	s.Version = ver
 }
 
+// Hook
 func (s *TCPServer) Before(id uint32, rf RouterFunc) {
 	s.Routers.Before(id, rf)
 }
@@ -137,4 +135,9 @@ func (s *TCPServer) On(id uint32, rf RouterFunc) {
 }
 func (s *TCPServer) After(id uint32, rf RouterFunc) {
 	s.Routers.After(id, rf)
+}
+
+//设置工作池大小
+func (s *TCPServer) SetWorkPoolSize(size uint32) {
+	s.Routers.SetWorkPoolSize(size)
 }
