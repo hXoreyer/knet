@@ -7,7 +7,7 @@ import (
 
 func main() {
 	s := knet.NewTCPServer("127.0.0.1", 5555)
-	s.SetWorkPoolSize(2)
+	s.SetWorkPoolSize(5)
 	/*
 		//全局中间件
 		s.Use(func(request knet.IRequest) {

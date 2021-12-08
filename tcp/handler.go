@@ -38,7 +38,6 @@ type Handler struct {
 	abort        bool
 	workpoolSize uint32
 	tasks        []chan IRequest
-	poolNum      map[uint32]uint32
 }
 
 //调度Router
@@ -112,7 +111,6 @@ func NewHandler() IHandler {
 		Middlewares:  make([]RouterFunc, 0),
 		abort:        false,
 		workpoolSize: 10,
-		poolNum:      make(map[uint32]uint32),
 	}
 }
 
@@ -121,35 +119,25 @@ func (h *Handler) RunWorkPool() {
 	h.tasks = make([]chan IRequest, h.workpoolSize)
 	for i := 0; i < int(h.workpoolSize); i++ {
 		h.tasks[i] = make(chan IRequest)
-		h.poolNum[uint32(i)] = 0
-		go h.runWork(i, h.tasks[i])
+		go h.runWork(h.tasks[i])
 	}
 	fmt.Printf("[WorkPool] %d workpools are Running...\n\n", h.workpoolSize)
 }
 
 //启动一个工作
-func (h *Handler) runWork(i int, tr chan IRequest) {
+func (h *Handler) runWork(tr chan IRequest) {
 	for {
 		select {
 		case rq := <-tr:
 			h.RunHandler(rq)
 			rid := rq.getRid()
 			(*rid)--
-			h.poolNum[uint32(i)]--
 		}
 	}
 }
 
 func (h *Handler) Send2Tasks(rq IRequest) {
-	id := 0
-	max := h.poolNum[0]
-	for k, v := range h.poolNum {
-		if v < uint32(max) {
-			max = v
-			id = int(k)
-		}
-	}
+	id := *(rq.getRid()) % h.workpoolSize
 	fmt.Printf("[WorkPool] Task id:%d work in pool id:%d\n", rq.GetID(), id)
-	h.poolNum[uint32(id)]++
 	h.tasks[id] <- rq
 }
