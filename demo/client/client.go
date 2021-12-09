@@ -8,12 +8,15 @@ import (
 	"time"
 )
 
+var exit = false
+
 func main() {
 	con, err := net.Dial("tcp", ":5555")
 	if err != nil {
 		fmt.Println("dail err:", err)
 		return
 	}
+	go Reader(con)
 	dp := knet.NewPack()
 
 	msg1 := &knet.Message{
@@ -32,10 +35,20 @@ func main() {
 	buf = append(buf, buf2...)
 	for {
 		con.Write(buf)
+		time.Sleep(time.Second)
+		if exit {
+			break
+		}
+	}
+}
+
+func Reader(con net.Conn) {
+	for {
 		dp := knet.NewPack()
 		head := make([]byte, dp.GetHeadLen())
 		if _, err := io.ReadFull(con, head); err != nil {
 			fmt.Println("read msg head err:", err)
+			exit = true
 			break
 		}
 
@@ -54,7 +67,5 @@ func main() {
 			msg.SetData(temp)
 		}
 		fmt.Printf("[Recv] ID = %d, Data = %s\n", msg.GetID(), string(msg.GetData()))
-
-		time.Sleep(time.Second)
 	}
 }

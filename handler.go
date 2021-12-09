@@ -44,7 +44,7 @@ type Handler struct {
 func (h *Handler) RunHandler(request IRequest) {
 	handle, ok := h.routers[request.GetID()]
 	if !ok {
-		fmt.Println("use unadded handler, id = ", request.GetID())
+		fmt.Println("[Error] Use unadded handler, id = ", request.GetID())
 		return
 	}
 	for k := range h.Middlewares {
@@ -138,6 +138,5 @@ func (h *Handler) runWork(tr chan IRequest) {
 
 func (h *Handler) Send2Tasks(rq IRequest) {
 	id := *(rq.getRid()) % h.workpoolSize
-	fmt.Printf("[WorkPool] Task id:%d work in pool id:%d\n", rq.GetID(), id)
 	h.tasks[id] <- rq
 }

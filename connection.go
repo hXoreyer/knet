@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"sync"
 )
 
 /*
@@ -24,6 +25,10 @@ type IConnection interface {
 	RemoteAddr() net.Addr
 	//发送数据
 	Send(id uint32, data []byte) error
+	//连接属性
+	SetProperty(key string, val interface{})
+	GetProperty(key string) (interface{}, error)
+	DelProperty(key string)
 }
 
 type HandleFunc func(*net.TCPConn, []byte, int) error
@@ -41,12 +46,16 @@ type Connection struct {
 	Routers IHandler
 	//无缓冲的读写channel
 	dataChan chan []byte
-	//请求ID
-	rid *uint32
+	//父server
+	father IServer
+	//保护属性
+	property map[string]interface{}
+	//保护锁
+	propertyLock sync.RWMutex
 }
 
 //初始化模块
-func NewConnection(con *net.TCPConn, id uint32, routers IHandler, rid *uint32) IConnection {
+func NewConnection(f IServer, con *net.TCPConn, id uint32, routers IHandler) IConnection {
 	c := &Connection{
 		Conn:     con,
 		ConnID:   id,
@@ -54,8 +63,10 @@ func NewConnection(con *net.TCPConn, id uint32, routers IHandler, rid *uint32) I
 		isClosed: false,
 		ExitChan: make(chan bool, 1),
 		dataChan: make(chan []byte),
-		rid:      rid,
+		father:   f,
+		property: make(map[string]interface{}),
 	}
+	c.father.GetManager().Add(c)
 	return c
 }
 
@@ -104,9 +115,10 @@ func (c *Connection) StartReader() {
 		}
 
 		//调用当前连接的路由方法
-		req := NewRequest(c, msg, c.rid)
-		*(c.rid)++
-		go c.Routers.Send2Tasks(req)
+		rid := c.father.GetRid()
+		req := NewRequest(c, msg, rid)
+		*(rid)++
+		c.Routers.Send2Tasks(req)
 	}
 }
 
@@ -117,6 +129,8 @@ func (c *Connection) Start() {
 	go c.StartReader()
 	// 启动写数据业务
 	go c.StartWriter()
+
+	go c.father.runOnStart(c)
 }
 
 //停止连接
@@ -127,10 +141,12 @@ func (c *Connection) Stop() {
 		return
 	}
 	c.isClosed = true
+	c.father.runOnStop(c)
 	c.Conn.Close()
 	c.ExitChan <- true
 	close(c.ExitChan)
 	close(c.dataChan)
+	c.father.GetManager().Del(c)
 }
 
 //获取当前连接绑定的conn
@@ -163,4 +179,27 @@ func (c *Connection) Send(id uint32, data []byte) error {
 
 	c.dataChan <- buff
 	return nil
+}
+
+//连接属性
+func (c *Connection) SetProperty(key string, val interface{}) {
+	c.propertyLock.Lock()
+	defer c.propertyLock.Unlock()
+
+	c.property[key] = val
+}
+func (c *Connection) GetProperty(key string) (interface{}, error) {
+	c.propertyLock.RLock()
+	defer c.propertyLock.RUnlock()
+
+	if val, ok := c.property[key]; ok {
+		return val, nil
+	}
+	return nil, errors.New("No Property")
+}
+func (c *Connection) DelProperty(key string) {
+	c.propertyLock.Lock()
+	defer c.propertyLock.Unlock()
+
+	delete(c.property, key)
 }

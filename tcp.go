@@ -5,37 +5,21 @@ import (
 	"net"
 )
 
-type IServer interface {
-	//运行服务器
-	Run()
-	//启动服务器
-	start()
-	//停止服务器
-	Stop()
-
-	//添加路由
-	AddRouter(id uint32, router IRouter)
-	//路由三部曲
-	Before(uint32, RouterFunc)
-	On(uint32, RouterFunc)
-	After(uint32, RouterFunc)
-	//添加全局中间件
-	Use(RouterFunc)
-	Abort()
-
-	//设置工作池大小
-	SetWorkPoolSize(uint32)
-}
-
 type TCPServer struct {
-	IP        string
-	Port      int
-	Conn      *net.TCPListener
-	IPVersion string
-	Routers   IHandler
-	Version   string
-	Name      string
-	rids      *uint32
+	IP             string
+	Port           int
+	Conn           *net.TCPListener
+	IPVersion      string
+	Routers        IHandler
+	Version        string
+	Name           string
+	cid            uint32
+	rids           *uint32
+	maxConnections uint32
+	manager        IManager
+	overload       overloadHandler
+	onStart        hookHandler
+	onStop         hookHandler
 }
 
 //启动服务器
@@ -65,10 +49,15 @@ func (s *TCPServer) start() {
 			fmt.Println("[Error] Accept err:", err)
 			continue
 		}
-		var cid uint32
-		cid = 0
-		dealCon := NewConnection(con, cid, s.Routers, s.rids)
-		cid++
+
+		if s.manager.Num() >= int(s.maxConnections) {
+			s.overload(con)
+			con.Close()
+			continue
+		}
+
+		dealCon := NewConnection(s, con, s.cid, s.Routers)
+		s.cid++
 		go dealCon.Start()
 	}
 
@@ -82,6 +71,7 @@ func (s *TCPServer) Run() {
 //停止服务器
 func (s *TCPServer) Stop() {
 	s.Conn.Close()
+	s.manager.Clear()
 }
 
 //添加路由
@@ -102,13 +92,16 @@ func (s *TCPServer) Abort() {
 //创建新的Server模块
 func NewTCPServer(ip string, port int) IServer {
 	return &TCPServer{
-		IPVersion: "tcp4",
-		IP:        ip,
-		Port:      port,
-		Routers:   NewHandler(),
-		Name:      "Knet",
-		Version:   "V1.0",
-		rids:      new(uint32),
+		IPVersion:      "tcp4",
+		IP:             ip,
+		Port:           port,
+		Routers:        NewHandler(),
+		Name:           "Knet",
+		Version:        "V1.0",
+		rids:           new(uint32),
+		maxConnections: 1024,
+		manager:        NewManager(),
+		cid:            0,
 	}
 }
 
@@ -140,4 +133,40 @@ func (s *TCPServer) After(id uint32, rf RouterFunc) {
 //设置工作池大小
 func (s *TCPServer) SetWorkPoolSize(size uint32) {
 	s.Routers.SetWorkPoolSize(size)
+}
+
+func (s *TCPServer) GetManager() IManager {
+	return s.manager
+}
+
+func (s *TCPServer) GetRid() *uint32 {
+	return s.rids
+}
+
+func (s *TCPServer) OverLoad(o overloadHandler) {
+	s.overload = o
+}
+
+func (s *TCPServer) SetMaxCon(size uint32) {
+	s.maxConnections = size
+}
+
+//连接创建hook
+func (s *TCPServer) OnStart(hook hookHandler) {
+	s.onStart = hook
+}
+func (s *TCPServer) runOnStart(q IConnection) {
+	if s.onStart != nil {
+		s.onStart(q)
+	}
+}
+
+//连接断开hook
+func (s *TCPServer) OnStop(c hookHandler) {
+	s.onStop = c
+}
+func (s *TCPServer) runOnStop(c IConnection) {
+	if s.onStop != nil {
+		s.onStop(c)
+	}
 }
