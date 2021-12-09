@@ -11,9 +11,10 @@ package main
 
 import (
 	"fmt"
-	"knet"
 	"net"
 	"time"
+
+	"github.com/hxoreyer/knet"
 )
 
 func main() {
@@ -96,9 +97,10 @@ package main
 import (
 	"fmt"
 	"io"
-	knet "knet/tcp"
 	"net"
 	"time"
+
+	"github.com/hxoreyer/knet"
 )
 
 var exit = false
