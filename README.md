@@ -6,7 +6,7 @@
 
 server:
 
-```golang
+```go
 package main
 
 import (
@@ -90,7 +90,7 @@ func main() {
 
 client:
 
-```
+```go
 package main
 
 import (
