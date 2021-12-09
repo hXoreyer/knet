@@ -2,9 +2,10 @@ package main
 
 import (
 	"fmt"
-	"knet"
 	"net"
 	"time"
+
+	"github.com/hxoreyer/knet"
 )
 
 func main() {
