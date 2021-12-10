@@ -18,13 +18,17 @@ func main() {
 		return
 	}
 	go Reader(con)
+
 	dp := knet.NewPack()
 
-	msg1 := &knet.Message{
-		Id:      1,
-		DataLen: 5,
-		Data:    []byte("keing"),
-	}
+	/*
+		msg1 := &knet.Message{
+			Id:      1,
+			DataLen: 5,
+			Data:    []byte("keing"),
+		}
+	*/
+	msg1 := knet.NewMessage(1, []byte("keing"))
 	buf, _ := dp.Pack(msg1)
 
 	msg2 := &knet.Message{
