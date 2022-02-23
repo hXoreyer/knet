@@ -38,14 +38,26 @@ func (p *Pack) Pack(msg IMessage) ([]byte, error) {
 	data := &bytes.Buffer{}
 
 	//将各个数据写进缓冲区
-	if err := binary.Write(data, binary.LittleEndian, msg.GetLen()); err != nil {
-		return nil, err
-	}
-	if err := binary.Write(data, binary.LittleEndian, msg.GetID()); err != nil {
-		return nil, err
-	}
-	if err := binary.Write(data, binary.LittleEndian, msg.GetData()); err != nil {
-		return nil, err
+	if little {
+		if err := binary.Write(data, binary.LittleEndian, msg.GetLen()); err != nil {
+			return nil, err
+		}
+		if err := binary.Write(data, binary.LittleEndian, msg.GetID()); err != nil {
+			return nil, err
+		}
+		if err := binary.Write(data, binary.LittleEndian, msg.GetData()); err != nil {
+			return nil, err
+		}
+	} else {
+		if err := binary.Write(data, binary.BigEndian, msg.GetLen()); err != nil {
+			return nil, err
+		}
+		if err := binary.Write(data, binary.BigEndian, msg.GetID()); err != nil {
+			return nil, err
+		}
+		if err := binary.Write(data, binary.BigEndian, msg.GetData()); err != nil {
+			return nil, err
+		}
 	}
 	return data.Bytes(), nil
 }
@@ -58,11 +70,20 @@ func (p *Pack) Unpack(data []byte) (IMessage, error) {
 	//获取Head
 	msg := &Message{}
 
-	if err := binary.Read(r, binary.LittleEndian, &msg.DataLen); err != nil {
-		return nil, err
-	}
-	if err := binary.Read(r, binary.LittleEndian, &msg.Id); err != nil {
-		return nil, err
+	if little {
+		if err := binary.Read(r, binary.LittleEndian, &msg.DataLen); err != nil {
+			return nil, err
+		}
+		if err := binary.Read(r, binary.LittleEndian, &msg.Id); err != nil {
+			return nil, err
+		}
+	} else {
+		if err := binary.Read(r, binary.BigEndian, &msg.DataLen); err != nil {
+			return nil, err
+		}
+		if err := binary.Read(r, binary.BigEndian, &msg.Id); err != nil {
+			return nil, err
+		}
 	}
 	return msg, nil
 }

@@ -5,6 +5,8 @@ import (
 	"net"
 )
 
+var little = false
+
 type TCPServer struct {
 	IP             string
 	Port           int
@@ -20,6 +22,16 @@ type TCPServer struct {
 	overload       overloadHandler
 	onStart        hookHandler
 	onStop         hookHandler
+}
+
+//开启大端
+func (s *TCPServer) SetBigEndian() {
+	little = false
+}
+
+//开启小端
+func (s *TCPServer) SetLittleEndian() {
+	little = true
 }
 
 //启动服务器
