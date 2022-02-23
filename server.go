@@ -40,4 +40,7 @@ type IServer interface {
 	//连接断开hook
 	OnStop(hookHandler)
 	runOnStop(IConnection)
+	//大小端
+	SetBigEndian()
+	SetLittleEndian()
 }

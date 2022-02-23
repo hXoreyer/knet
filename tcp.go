@@ -24,12 +24,12 @@ type TCPServer struct {
 	onStop         hookHandler
 }
 
-//开启大端模式
+//开启大端
 func (s *TCPServer) SetBigEndian() {
 	little = false
 }
 
-//开启小端模式
+//开启小端
 func (s *TCPServer) SetLittleEndian() {
 	little = true
 }

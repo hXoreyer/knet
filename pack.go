@@ -38,7 +38,7 @@ func (p *Pack) Pack(msg IMessage) ([]byte, error) {
 	data := &bytes.Buffer{}
 
 	//将各个数据写进缓冲区
-	if little {
+	if little { //大小端判断
 		if err := binary.Write(data, binary.LittleEndian, msg.GetLen()); err != nil {
 			return nil, err
 		}
@@ -70,7 +70,7 @@ func (p *Pack) Unpack(data []byte) (IMessage, error) {
 	//获取Head
 	msg := &Message{}
 
-	if little {
+	if little { //大小端判断
 		if err := binary.Read(r, binary.LittleEndian, &msg.DataLen); err != nil {
 			return nil, err
 		}
